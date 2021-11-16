@@ -25,8 +25,8 @@ public class GoodsUtil {
                 // 如果钱够则购买成功
                 if (userMoney >= goods.getPrice()) {
                     List<Goods> goodsIdList = getHasGoodsIdList(userId);
-                    // 判断之前是否购买过
-                    if (goodsIdList.contains(goods)) {
+                    // 判断之前是否购买过 并且不是消耗品
+                    if (!goods.isConsumed() && goodsIdList.contains(goods)) {
                         return ResultBean.error("你已经买过了");
                     } else {
                         MoneyUtil.setMoney(userId, userMoney - goods.getPrice());
@@ -52,6 +52,26 @@ public class GoodsUtil {
         return ResultBean.error("未找到商品");
     }
 
+    public static ResultBean useGoods(Long userId, Integer goodsId) throws Exception {
+        Connection connection = JDBCUtil.getConnection();
+        String sql = "delete from user_goods_mapping " +
+                "where id = (select id from user_goods_mapping ugm where user_id = ? and goods_id = ? limit 1)";
+        PreparedStatement pst = connection.prepareStatement(sql);
+        try {
+            pst.setLong(1, userId);
+            pst.setInt(2, goodsId);
+            Integer result = pst.executeUpdate();
+            if (result == 0) {
+                return ResultBean.error("使用失败,你没有该物品");
+            } else {
+                return ResultBean.success("使用成功");
+            }
+        } catch (Exception e) {
+            throw e;
+        } finally {
+            pst.close();
+        }
+    }
 
     public static List<Goods> getHasGoodsIdList(Long userId) throws Exception {
         Connection connection = JDBCUtil.getConnection();

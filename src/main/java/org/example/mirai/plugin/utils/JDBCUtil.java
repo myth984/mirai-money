@@ -60,6 +60,13 @@ public class JDBCUtil {
                         ");\n" +
                         "CREATE UNIQUE INDEX user_goods_mapping_user_id_IDX ON user_goods_mapping (user_id,goods_id);\n";
                 statement.execute(userGoodsSQL);
+                // 抢劫日志表
+                String robLog = "CREATE TABLE rob_log (\n" +
+                        "\tuser_id BIGINT NOT NULL,\n" +
+                        "\tmoney INTEGER NOT NULL,\n" +
+                        "\tdate DATETIME NOT NULL\n" +
+                        ");";
+                statement.execute(userGoodsSQL);
 
             } catch (Exception e) {
                 throw e;

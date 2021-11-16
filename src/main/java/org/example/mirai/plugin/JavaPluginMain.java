@@ -8,6 +8,7 @@ import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder;
 import net.mamoe.mirai.contact.Contact;
 import net.mamoe.mirai.contact.Friend;
 import net.mamoe.mirai.contact.Member;
+import net.mamoe.mirai.contact.NormalMember;
 import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.EventChannel;
 import net.mamoe.mirai.event.GlobalEventChannel;
@@ -18,6 +19,7 @@ import net.mamoe.mirai.utils.ExternalResource;
 import net.mamoe.mirai.utils.MiraiLogger;
 import org.example.mirai.plugin.enity.Goods;
 import org.example.mirai.plugin.enity.ResultBean;
+import org.example.mirai.plugin.enity.RobLog;
 import org.example.mirai.plugin.enity.User;
 import org.example.mirai.plugin.utils.*;
 import org.jetbrains.annotations.NotNull;
@@ -58,7 +60,7 @@ public final class JavaPluginMain extends JavaPlugin {
     public static final JavaPluginMain INSTANCE = new JavaPluginMain();
 
     private JavaPluginMain() {
-        super(new JvmPluginDescriptionBuilder("cn.tui.money", "0.0.3")
+        super(new JvmPluginDescriptionBuilder("cn.tui.money", "0.0.4")
                 .info("瞎整")
                 .build());
     }
@@ -117,6 +119,8 @@ public final class JavaPluginMain extends JavaPlugin {
             case "help":
                 help(event);
                 break;
+            case "万径人踪灭":
+                noSpeakAll(event);
             default:
                 // 听不懂洋屁
                 try {
@@ -127,6 +131,12 @@ public final class JavaPluginMain extends JavaPlugin {
                     } else if (isAtMsg(msg, "抢劫")) {
                         Long userId = getUserIdByAtMsg(msg);
                         rob(event, userId);
+                    } else if (isAtMsg(msg, "小胶带")) {
+                        Long userId = getUserIdByAtMsg(msg);
+                        smallJd(event, userId);
+                    } else if (isAtMsg(msg, "大胶带")) {
+                        Long userId = getUserIdByAtMsg(msg);
+                        bigJd(event, userId);
                     } else {
                         // 开始正则验证
                         Pattern buyPattern = Pattern.compile("购买\\s(\\d+)");
@@ -154,12 +164,73 @@ public final class JavaPluginMain extends JavaPlugin {
     }
 
 
+    public void smallJd(GroupMessageEvent event, Long aimId) throws Exception {
+        Long sourceId = event.getSender().getId();
+        ResultBean resultBean = GoodsUtil.useGoods(sourceId, 4);
+        if (resultBean.getSuccess()) {
+            noSpeak(event, aimId, 1);
+        } else {
+            event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                    resultBean.getMsg()
+            ));
+        }
+    }
+
+    public void noSpeakAll(GroupMessageEvent event) throws Exception {
+        Long sourceId = event.getSender().getId();
+        ResultBean resultBean = GoodsUtil.useGoods(sourceId, 6);
+        if (resultBean.getSuccess()) {
+            event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                    String.format("%s使用了万径人踪灭!!!!!", event.getSender().getNameCard())
+            ));
+            event.getGroup().getSettings().setMuteAll(true);
+            new Thread(() -> {
+                try {
+                    Thread.sleep(15 * 60 * 1000L);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                event.getGroup().getSettings().setMuteAll(false);
+            }).start();
+        } else {
+            event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                    resultBean.getMsg()
+            ));
+        }
+    }
+
+
+    public void bigJd(GroupMessageEvent event, Long aimId) throws Exception {
+        Long sourceId = event.getSender().getId();
+        ResultBean resultBean = GoodsUtil.useGoods(sourceId, 5);
+        if (resultBean.getSuccess()) {
+            noSpeak(event, aimId, 5);
+        } else {
+            event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                    resultBean.getMsg()
+            ));
+        }
+
+    }
+
+
+    public void noSpeak(GroupMessageEvent event, Long aimId, Integer minute) {
+        NormalMember m = event.getGroup().get(aimId);
+        if (m.isMuted()) {
+            event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                    String.format("%s 已经被禁言, 道具也不退了", m.getNameCard())
+            ));
+        } else {
+            m.mute(minute * 60);
+        }
+
+    }
+
     public void buy(GroupMessageEvent event, Integer goodsId) throws Exception {
         Long userId = event.getSender().getId();
         ResultBean resultBean = GoodsUtil.buy(userId, goodsId);
         Goods goods = Goods.goodsMap.get(goodsId);
         if (goods != null) {
-
             if (resultBean.getSuccess()) {
                 event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
                         String.format("购买[%s]成功  已经放入背包", goods.getName())
@@ -253,6 +324,13 @@ public final class JavaPluginMain extends JavaPlugin {
             event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus("这个穷逼一分钱没有"));
             return;
         }
+        List<RobLog> robLogs = RobLogUtil.getToDayRobLogs(sourceId);
+        if (robLogs.size() >= 5) {
+            Integer robMoney = robLogs.stream().mapToInt(RobLog::getMoney).sum();
+            event.getSubject().sendMessage(new QuoteReply(event.getSource())
+                    .plus(String.format("收手吧,本日抢劫已上限,今日共抢了%s金币", robMoney)));
+            return;
+        }
         // 0 - 10
         List<Goods> sourceGoods = GoodsUtil.getHasGoodsIdList(sourceId);
         List<Goods> aimGoods = GoodsUtil.getHasGoodsIdList(aimId);
@@ -290,7 +368,7 @@ public final class JavaPluginMain extends JavaPlugin {
         String msg = null;
         if (sourceValue >= aimValue) {
             // 抢劫成功
-            Integer loseMoney = MoneyUtil.generateRandomMoney(10);
+            Integer loseMoney = MoneyUtil.generateRandomMoney(1, 10);
             if (loseMoney > aimUserMoney) {
                 loseMoney = aimUserMoney;
             }
@@ -298,9 +376,11 @@ public final class JavaPluginMain extends JavaPlugin {
             msg = String.format("抢劫成功,抢到了%s金币\n当前余额%s金币", loseMoney, nowMoney);
             MoneyUtil.setMoney(sourceId, nowMoney);
             MoneyUtil.setMoney(aimId, aimUserMoney - loseMoney);
+            // 存入日志表
+            RobLogUtil.addRobLog(sourceId, loseMoney);
         } else {
             // 抢劫失败
-            Integer loseMoney = MoneyUtil.generateRandomMoney(10);
+            Integer loseMoney = MoneyUtil.generateRandomMoney(1, 10);
             if (loseMoney > sourceUserMoney) {
                 loseMoney = sourceUserMoney;
             }
@@ -308,8 +388,9 @@ public final class JavaPluginMain extends JavaPlugin {
             msg = String.format("抢劫失败,你没有打过对方,对方反手抢了你%s金币\n当前余额%s金币", loseMoney, nowMoney);
             MoneyUtil.setMoney(sourceId, nowMoney);
             MoneyUtil.setMoney(aimId, loseMoney + aimUserMoney);
+            // 存入日志表
+            RobLogUtil.addRobLog(sourceId, -loseMoney);
         }
-
         event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(msg));
     }
 
