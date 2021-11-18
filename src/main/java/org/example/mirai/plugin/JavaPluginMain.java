@@ -14,6 +14,7 @@ import net.mamoe.mirai.event.EventChannel;
 import net.mamoe.mirai.event.GlobalEventChannel;
 import net.mamoe.mirai.event.events.FriendMessageEvent;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
+import net.mamoe.mirai.message.code.MiraiCode;
 import net.mamoe.mirai.message.data.*;
 import net.mamoe.mirai.utils.ExternalResource;
 import net.mamoe.mirai.utils.MiraiLogger;
@@ -60,7 +61,7 @@ public final class JavaPluginMain extends JavaPlugin {
     public static final JavaPluginMain INSTANCE = new JavaPluginMain();
 
     private JavaPluginMain() {
-        super(new JvmPluginDescriptionBuilder("cn.tui.money", "0.0.4")
+        super(new JvmPluginDescriptionBuilder("cn.tui.money", "0.0.5")
                 .info("瞎整")
                 .build());
     }
@@ -68,7 +69,6 @@ public final class JavaPluginMain extends JavaPlugin {
     @Override
     public void onEnable() {
         MiraiLogger logger = getLogger();
-        getLogger().info("当前版本:" + "0.0.1");
         getLogger().info("路径分割" + System.getProperty("file.separator"));
         // 设置数据库位置
         try {
@@ -100,8 +100,24 @@ public final class JavaPluginMain extends JavaPlugin {
 //        });
     }
 
+
+    public static String LAST_MSG = null;
+
+    // 复读机
+    public void fuduji(GroupMessageEvent event) {
+        String msg = event.getMessage().serializeToMiraiCode();
+        if (msg.equals(LAST_MSG)) {
+            // 上一条消息和本条消息一样则复读
+            event.getSubject().sendMessage(MiraiCode.deserializeMiraiCode(msg));
+            LAST_MSG = null;
+        } else {
+            LAST_MSG = msg;
+        }
+    }
+
     public void handleEvent(GroupMessageEvent event) throws Exception {
         String msg = event.getMessage().contentToString();
+
         switch (msg) {
             // 开始完全匹配
             case "签到":
@@ -128,15 +144,19 @@ public final class JavaPluginMain extends JavaPlugin {
                     if (isAtMsg(msg, "查询")) {
                         Long userId = getUserIdByAtMsg(msg);
                         details(event, userId);
+                        return;
                     } else if (isAtMsg(msg, "抢劫")) {
                         Long userId = getUserIdByAtMsg(msg);
                         rob(event, userId);
+                        return;
                     } else if (isAtMsg(msg, "小胶带")) {
                         Long userId = getUserIdByAtMsg(msg);
                         smallJd(event, userId);
+                        return;
                     } else if (isAtMsg(msg, "大胶带")) {
                         Long userId = getUserIdByAtMsg(msg);
                         bigJd(event, userId);
+                        return;
                     } else {
                         // 开始正则验证
                         Pattern buyPattern = Pattern.compile("购买\\s(\\d+)");
@@ -144,12 +164,14 @@ public final class JavaPluginMain extends JavaPlugin {
                         if (buyMatcher.find()) {
                             Integer goodsId = Integer.valueOf(buyMatcher.group(1));
                             buy(event, goodsId);
+                            return;
                         }
-
                     }
+                    fuduji(event);
                 } catch (Exception e) {
                     getLogger().error(e);
                 }
+
                 break;
         }
     }
@@ -259,8 +281,7 @@ public final class JavaPluginMain extends JavaPlugin {
             return;
         }
         MoneyUtil.setMoney(userId, money - 1);
-        Integer imgId = MoneyUtil.generateRandomMoney(0, 98878);
-        URL url = new URL(String.format("https://spider-1252739196.cos.ap-beijing.myqcloud.com/spider/img/%s.jpg", imgId));
+        URL url = new URL("https://api.nmb.show/xiaojiejie1.php");
         URLConnection uc = url.openConnection();
         InputStream inputStream = uc.getInputStream();
         Contact.sendImage(event.getGroup(), inputStream);
@@ -291,7 +312,7 @@ public final class JavaPluginMain extends JavaPlugin {
             if (nowDateStr.equals(dateStr)) {
                 msg = String.format("%s 今天已经签过到了\n你在想peach", user.getNick());
             } else {
-                Integer money = MoneyUtil.generateRandomMoney(0, 100);
+                Integer money = MoneyUtil.generateRandomMoney(30, 100);
                 msg = String.format("%s 签到成功\n获得%s个金币", user.getNick(), money);
                 SignUtil.sign(userId);
                 MoneyUtil.addMoney(userId, money);
