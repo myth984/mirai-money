@@ -66,7 +66,26 @@ public class JDBCUtil {
                         "\tmoney INTEGER NOT NULL,\n" +
                         "\tdate DATETIME NOT NULL\n" +
                         ");";
-                statement.execute(userGoodsSQL);
+                statement.execute(robLog);
+
+                String duboLog = "CREATE TABLE dubo_log (\n" +
+                        "\tuser_id BIGINT,\n" +
+                        "\tmoney INTEGER,\n" +
+                        "\tdate DATETIME\n" +
+                        ");\n";
+                statement.execute(duboLog);
+                String caipiao = "CREATE TABLE caipiao (\n" +
+                        "\tuser_id BIGINT NOT NULL,\n" +
+                        "\tmoney INTEGER NOT NULL,\n" +
+                        "\tdate DATETIME,\n" +
+                        "\t\"number\" INTEGER NOT NULL\n" +
+                        ", sure INTEGER);\n";
+                statement.execute(caipiao);
+                String caipiaoPool = "CREATE TABLE caipiao_pool (\n" +
+                        "\tmoney INTEGER\n" +
+                        ")";
+                statement.execute(caipiaoPool);
+
 
             } catch (Exception e) {
                 throw e;

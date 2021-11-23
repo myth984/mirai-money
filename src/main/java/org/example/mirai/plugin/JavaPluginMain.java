@@ -1,44 +1,32 @@
 package org.example.mirai.plugin;
 
-import io.ktor.http.Url;
-import kotlinx.coroutines.CoroutineScope;
+import net.mamoe.mirai.console.data.PluginDataStorage;
+import net.mamoe.mirai.console.extension.PluginComponentStorage;
 import net.mamoe.mirai.console.plugin.jvm.JavaPlugin;
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription;
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescriptionBuilder;
 import net.mamoe.mirai.contact.Contact;
-import net.mamoe.mirai.contact.Friend;
 import net.mamoe.mirai.contact.Member;
 import net.mamoe.mirai.contact.NormalMember;
 import net.mamoe.mirai.event.Event;
 import net.mamoe.mirai.event.EventChannel;
 import net.mamoe.mirai.event.GlobalEventChannel;
-import net.mamoe.mirai.event.events.FriendMessageEvent;
 import net.mamoe.mirai.event.events.GroupMessageEvent;
 import net.mamoe.mirai.message.code.MiraiCode;
 import net.mamoe.mirai.message.data.*;
-import net.mamoe.mirai.utils.ExternalResource;
 import net.mamoe.mirai.utils.MiraiLogger;
-import org.example.mirai.plugin.enity.Goods;
-import org.example.mirai.plugin.enity.ResultBean;
-import org.example.mirai.plugin.enity.RobLog;
-import org.example.mirai.plugin.enity.User;
+import org.example.mirai.plugin.enity.*;
 import org.example.mirai.plugin.utils.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Connection;
-import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
 /**
@@ -61,7 +49,7 @@ public final class JavaPluginMain extends JavaPlugin {
     public static final JavaPluginMain INSTANCE = new JavaPluginMain();
 
     private JavaPluginMain() {
-        super(new JvmPluginDescriptionBuilder("cn.tui.money", "0.0.5")
+        super(new JvmPluginDescriptionBuilder("cn.tui.money", "0.0.6")
                 .info("瞎整")
                 .build());
     }
@@ -73,7 +61,8 @@ public final class JavaPluginMain extends JavaPlugin {
         // 设置数据库位置
         try {
             JDBCUtil.setPath(getDataFolderPath().toString());
-            Connection connection = JDBCUtil.getConnection();
+            // 开始定时任务
+            CaiPiaoUtil.startLoop();
         } catch (Exception e) {
             e.printStackTrace();
             getLogger().error(e);
@@ -122,21 +111,28 @@ public final class JavaPluginMain extends JavaPlugin {
             // 开始完全匹配
             case "签到":
                 sign(event);
-                break;
+                return;
             case "查询":
                 details(event);
-                break;
+                return;
             case "商店":
                 shop(event);
-                break;
+                return;
             case "sin":
                 setu(event);
-                break;
+                return;
             case "help":
                 help(event);
-                break;
+                return;
             case "万径人踪灭":
                 noSpeakAll(event);
+                return;
+            case "割韭菜":
+                dubo(event);
+                return;
+            case "持有彩票":
+                queryCaiPiao(event);
+                return;
             default:
                 // 听不懂洋屁
                 try {
@@ -161,10 +157,19 @@ public final class JavaPluginMain extends JavaPlugin {
                         // 开始正则验证
                         Pattern buyPattern = Pattern.compile("购买\\s(\\d+)");
                         Matcher buyMatcher = buyPattern.matcher(msg);
+
+                        // 买彩票
+
+                        Pattern caiPiaoPattern = Pattern.compile("购买彩票\\s(\\d+)\\s(\\d+)");
+                        Matcher caiPiaoMatcher = caiPiaoPattern.matcher(msg);
                         if (buyMatcher.find()) {
                             Integer goodsId = Integer.valueOf(buyMatcher.group(1));
                             buy(event, goodsId);
                             return;
+                        } else if (caiPiaoMatcher.find()) {
+                            Integer number = Integer.valueOf(caiPiaoMatcher.group(1));
+                            Integer money = Integer.valueOf(caiPiaoMatcher.group(2));
+                            buyCaiPiao(event, number, money);
                         }
                     }
                     fuduji(event);
@@ -198,6 +203,92 @@ public final class JavaPluginMain extends JavaPlugin {
         }
     }
 
+    public void queryCaiPiao(GroupMessageEvent event) throws Exception {
+        Long userId = event.getSender().getId();
+        List<CaiPiao> list = CaiPiaoUtil.getSureCaiPiao(userId);
+        if (list == null || list.size() == 0) {
+            event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                    "暂无持有彩票\n输入 购买彩票 号码(1-100) 金额\n如购买彩票 2 200"
+            ));
+            return;
+        }
+        String msg = "持有彩票:";
+        Map<Integer, List<CaiPiao>> map = list.stream().collect(Collectors.groupingBy(CaiPiao::getNumber));
+        for (Integer number : map.keySet()) {
+            Integer money = map.get(number).stream().mapToInt(CaiPiao::getMoney).sum();
+            msg += String.format("\n[%s]号彩票 %s金币", number, money);
+        }
+        event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                msg
+        ));
+    }
+
+    public void caiPiaoDetails(GroupMessageEvent event) throws Exception {
+        event.getSubject().sendMessage(new QuoteReply(event.getSource())
+                .plus("每日 11点 3点 5点 开奖, 一金币一注\n" +
+                        "输入 购买彩票 "));
+        return;
+    }
+
+    public void dubo(GroupMessageEvent event) throws Exception {
+
+        Long userId = event.getSender().getId();
+
+        List<DuboLog> duboLogs = DuboUtil.getToDayDuboLogs(userId);
+        if (duboLogs.size() > 10) {
+            Integer duboMoney = duboLogs.stream().mapToInt(DuboLog::getMoney).sum();
+            event.getSubject().sendMessage(new QuoteReply(event.getSource())
+                    .plus(String.format("收手吧,久赌必输")));
+            return;
+        }
+
+
+        Integer cardMoney = 50;
+        Integer nowMoney = MoneyUtil.getMoney(userId);
+        if (nowMoney < cardMoney) {
+            event.getSubject().sendMessage("至少需要" + cardMoney + "金币");
+            return;
+        }
+        // 扣除入场费
+        nowMoney = nowMoney - cardMoney;
+        // 生成随机数
+        String msg = String.format("%s进入了赌场,花费%s\n", event.getSender().getNameCard(), cardMoney);
+        // 调高输的精光的概率
+        Integer score = MoneyUtil.generateRandomMoney(0, 101);
+        if (score <= 40) {
+            Integer gMoney = MoneyUtil.generateRandomMoney(30, 35);
+            msg += String.format("%s,赢了%s", DuboUtil.getPlayName(), gMoney);
+            nowMoney = nowMoney + gMoney;
+        } else if (score > 40 && score <= 70) {
+            Integer gMoney = MoneyUtil.generateRandomMoney(35, 60);
+            msg += String.format("%s,赢了%s", DuboUtil.getPlayName(), gMoney);
+            nowMoney = nowMoney + gMoney;
+        } else if (score > 70 && score <= 90) {
+            Integer gMoney = MoneyUtil.generateRandomMoney(60, 80);
+            msg += String.format("%s,赢了%s", DuboUtil.getPlayName(), gMoney);
+            nowMoney = nowMoney + gMoney;
+        } else if (score > 90 && score <= 98) {
+            Integer gMoney = MoneyUtil.generateRandomMoney(60, 80);
+            msg += String.format("%s,赢了%s", DuboUtil.getPlayName(), gMoney);
+            nowMoney = nowMoney + gMoney;
+        } else if (score == 99) {
+            nowMoney = nowMoney + 500;
+            msg += String.format("牛哇,把赌场硬走了,赢了%s", 500);
+        } else {
+            nowMoney = nowMoney - 500;
+            if (nowMoney < 0) {
+                nowMoney = 0;
+            }
+            msg += String.format("出老千被砍了手,失去500金币");
+        }
+        MoneyUtil.setMoney(userId, nowMoney);
+        DuboUtil.addDuboLog(userId, nowMoney);
+        event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                msg
+        ));
+
+    }
+
     public void noSpeakAll(GroupMessageEvent event) throws Exception {
         Long sourceId = event.getSender().getId();
         ResultBean resultBean = GoodsUtil.useGoods(sourceId, 6);
@@ -205,15 +296,10 @@ public final class JavaPluginMain extends JavaPlugin {
             event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
                     String.format("%s使用了万径人踪灭!!!!!", event.getSender().getNameCard())
             ));
-            event.getGroup().getSettings().setMuteAll(true);
-            new Thread(() -> {
-                try {
-                    Thread.sleep(15 * 60 * 1000L);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                event.getGroup().getSettings().setMuteAll(false);
-            }).start();
+            List<User> userList = UserUtils.getAllUser();
+            for (User user : userList) {
+                noSpeak(event, user.getId(), 10);
+            }
         } else {
             event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
                     resultBean.getMsg()
@@ -265,22 +351,31 @@ public final class JavaPluginMain extends JavaPlugin {
         }
     }
 
+    public void buyCaiPiao(GroupMessageEvent event, Integer number, Integer money) throws Exception {
+        Long userId = event.getSender().getId();
+        ResultBean resultBean = CaiPiaoUtil.buyCaiPiao(userId, number, money);
+        event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
+                resultBean.getMsg()
+        ));
+    }
+
     public void help(GroupMessageEvent event) throws Exception {
         event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
-                "签到\n查询\n商店\nsin\n抢劫 @xxx\n购买 ?"
+                "签到\n查询\n商店\nsin\n抢劫 @xxx\n购买 ?\n割韭菜\n" +
+                        "彩票\n持有彩票\n购买彩票 number(1-100) money"
         ));
     }
 
     public void setu(GroupMessageEvent event) throws Exception {
         Long userId = event.getSender().getId();
         Integer money = MoneyUtil.getMoney(userId);
-        if (money < 1) {
+        if (money < 10) {
             event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
-                    String.format("1金币,才能看色图,穷逼不配")
+                    String.format("10金币,才能看色图,穷逼不配")
             ));
             return;
         }
-        MoneyUtil.setMoney(userId, money - 1);
+        MoneyUtil.setMoney(userId, money - 10);
         URL url = new URL("https://api.nmb.show/xiaojiejie1.php");
         URLConnection uc = url.openConnection();
         InputStream inputStream = uc.getInputStream();
