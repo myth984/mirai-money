@@ -50,7 +50,9 @@ public class CaiPiaoOpen implements Job {
                     }
                     // 失效所有彩票
                     CaiPiaoUtil.setCaiPiaoFalse();
+                    CaiPiaoUtil.setPoolMoney(0);
                     group.sendMessage(msg);
+
                 } catch (Exception e) {
                     group.sendMessage("开奖失败:\n" + e.toString());
                 }

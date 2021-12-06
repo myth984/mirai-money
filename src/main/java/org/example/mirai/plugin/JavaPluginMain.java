@@ -331,7 +331,6 @@ public final class JavaPluginMain extends JavaPlugin {
         } else {
             m.mute(minute * 60);
         }
-
     }
 
     public void buy(GroupMessageEvent event, Integer goodsId) throws Exception {
@@ -362,20 +361,20 @@ public final class JavaPluginMain extends JavaPlugin {
     public void help(GroupMessageEvent event) throws Exception {
         event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
                 "签到\n查询\n商店\nsin\n抢劫 @xxx\n购买 ?\n割韭菜\n" +
-                        "彩票\n持有彩票\n购买彩票 number(1-100) money"
+                        "持有彩票\n购买彩票 number(1-100) money"
         ));
     }
 
     public void setu(GroupMessageEvent event) throws Exception {
         Long userId = event.getSender().getId();
         Integer money = MoneyUtil.getMoney(userId);
-        if (money < 10) {
+        if (money < 2) {
             event.getSubject().sendMessage(new QuoteReply(event.getSource()).plus(
-                    String.format("10金币,才能看色图,穷逼不配")
+                    String.format("2金币,才能看色图,穷逼不配")
             ));
             return;
         }
-        MoneyUtil.setMoney(userId, money - 10);
+        MoneyUtil.setMoney(userId, money - 2);
         URL url = new URL("https://api.nmb.show/xiaojiejie1.php");
         URLConnection uc = url.openConnection();
         InputStream inputStream = uc.getInputStream();
@@ -451,7 +450,7 @@ public final class JavaPluginMain extends JavaPlugin {
         List<Goods> sourceGoods = GoodsUtil.getHasGoodsIdList(sourceId);
         List<Goods> aimGoods = GoodsUtil.getHasGoodsIdList(aimId);
         Integer sourceValue = MoneyUtil.generateRandomMoney(0, 50);
-        Integer aimValue = MoneyUtil.generateRandomMoney(0, 50);
+        Integer aimValue = MoneyUtil.generateRandomMoney(0, 40);
         // 计算抢劫人的分数
         for (Goods goods : sourceGoods) {
             switch (goods.getId()) {

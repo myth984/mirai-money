@@ -26,8 +26,6 @@ public class CaiPiaoUtil {
     public static void startLoop() throws SchedulerException {
         JobDetail jobDetail = JobBuilder.newJob(CaiPiaoOpen.class).build();
         Trigger trigger = TriggerBuilder.newTrigger()
-                .withSchedule(CronScheduleBuilder.cronSchedule("0 0 11 * * ?"))
-                .withSchedule(CronScheduleBuilder.cronSchedule("0 0 15 * * ?"))
                 .withSchedule(CronScheduleBuilder.cronSchedule("0 0 18 * * ?"))
                 .build();
         Scheduler scheduler =  new StdSchedulerFactory().getScheduler();

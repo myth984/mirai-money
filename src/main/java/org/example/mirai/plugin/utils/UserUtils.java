@@ -12,7 +12,7 @@ import java.util.List;
 public class UserUtils {
     public static List<User> getAllUser() throws Exception {
         Connection connection = JDBCUtil.getConnection();
-        String sql = "select id, money from money";
+        String sql = "select id, money from user";
         PreparedStatement pst = connection.prepareStatement(sql);
         ResultSet rs = null;
         try {
